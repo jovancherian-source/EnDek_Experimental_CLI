@@ -1,0 +1,20 @@
+# Third-Party Dependencies (Required to be installed via pip)
+argon2-cffi>=23.1.0
+
+# Standard Library Modules used in the codebase:
+# (These are built into Python and do not need to be installed)
+#
+# Core:
+# - sqlite3
+# - getpass
+# - sys
+# - os
+# - time
+# - random
+# - secrets
+#
+# Conditional/Platform-Specific Imports (for keyboard detection):
+# - msvcrt (Windows only, built-in)
+# - tty (Unix only, built-in)
+# - termios (Unix only, built-in)
+# - select (Unix only, built-in)
