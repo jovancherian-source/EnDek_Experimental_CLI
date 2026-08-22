@@ -461,6 +461,35 @@ def Scramble_settings_menu():
     ])
 
 
+# ── Change Scrambler — method picker ─────────────────────────
+
+def new_Scramble_settings_menu():
+    """
+    Shown when the user picks 'Change Scrambler'.
+    Returns "1" (custom key), "2" (random key), or "3" (cancel).
+    """
+    print(_header("Scrambler Key", "🔑", breadcrumb="home / config / encryption / scrambler"))
+    print()
+
+    return _select_menu([
+        ("1", "Enter Custom Scrambler Key"),
+        ("2", "Generate Random Scrambler Key"),
+        ("3", "Cancel"),
+    ])
+
+
+# ── Enter Custom Scrambler Key ────────────────────────────────
+
+def new_Scramble_key_for_pre_user():
+    """
+    Prompts the user to type a custom scrambler key string.
+    Returns the raw key string.
+    """
+    print(_header("Custom Scrambler Key", "🔑", breadcrumb="home / config / encryption / scrambler"))
+    print()
+    return prompt_text("Scrambler Key")
+
+
 # ══════════════════════════════════════════════════════════════
 #  INTERACTIVE INPUT PROMPTS
 # ══════════════════════════════════════════════════════════════

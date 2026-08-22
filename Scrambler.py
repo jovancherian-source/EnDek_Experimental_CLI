@@ -73,3 +73,12 @@ def unscrambler(scrambled_encryption_key, username):
     for item in sorted_index_numbers:
          return_encryption_key.append(scrambled_encryption_key[item[0]])
     return "".join(return_encryption_key)
+
+def scrambeler_updater(scrambler_key, username):
+    connection = sqlite3.connect("scrambler.db")
+    cursor = connection.cursor()
+    cursor.execute(f"DELETE FROM '{username}'")
+    index_numbers = scrambler_key.strip('[]').split(', ')
+    for index in range(len(index_numbers)):
+        cursor.execute(f"INSERT INTO '{username}'(position, index_number) VALUES(?, ?)", (index, index_numbers[index]))
+    connection.commit()
