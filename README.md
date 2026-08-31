@@ -31,3 +31,8 @@ Experimental development and testing of the EnDek CLI.
 
 Future:
 Potential features and improvements developed here may be merged into the original EnDek project.
+
+##Stack
+
+Antigravity
+Claude Code
