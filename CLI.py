@@ -363,8 +363,21 @@ def EnDek_config_logo():
         ("1", "Encryption Settings"),
         ("2", "Account Settings"),
         ("3", "Database Settings"),
-        ("4", "About EnDek"),
+        ("4", "EnDek Settings"),
         ("5", "Exit"),
+    ])
+
+
+# ── EnDek Settings ───────────────────────────────────────────
+
+def endek_dual_settings():
+    print(_header("EnDek Settings", "⚙", breadcrumb="home / config"))
+    print()
+
+    return _select_menu([
+        ("1", "About EnDek"),
+        ("2", "Check for Updates"),
+        ("3", "← Back"),
     ])
 
 
