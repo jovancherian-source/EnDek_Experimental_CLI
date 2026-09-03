@@ -1,62 +1,112 @@
+"""
+EnDek CLI — Terminal Interface
+Redesigned with Anthropic Claude Code aesthetic:
+  - Exact palette from Design.md (Warm Coral #cc785c, Cream #faf9f5, Dark Surface #181715)
+  - Claude Code Clawd mascot + filled block logo with vertical warm coral gradient
+  - Arrow-key interactive navigation with in-place collapse
+  - Rounded Unicode cards, callouts, and code-block result containers
+  - Full cross-platform support (Windows / macOS / Linux)
+"""
+
 import sys
 import os
 import time
+import textwrap
+import getpass as _getpass
 
 # ── UTF-8 Compatibility ───────────────────────────────────────
 # Windows terminals default to cp1252 which breaks Unicode glyphs.
-
 if sys.stdout.encoding != "utf-8":
-    sys.stdout.reconfigure(encoding="utf-8")
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 if sys.stderr.encoding != "utf-8":
-    sys.stderr.reconfigure(encoding="utf-8")
+    try:
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 
 
 # ══════════════════════════════════════════════════════════════
-#  COLOR SYSTEM
+#  COLOR SYSTEM  (24-bit TrueColor matching Design.md)
 # ══════════════════════════════════════════════════════════════
-# The orange palette (ANSI-214 / 208 / 172) is the brand identity.
-# Supporting tones create a layered visual hierarchy without
-# departing from the original color intention.
+# Anthropic Claude Palette:
+#   primary:              #cc785c  (signature warm coral)
+#   primary-active:       #a9583e  (active / pressed coral)
+#   accent-amber:         #e8a55a  (warm companion tone)
+#   accent-teal:          #5db8a6  (status indicator teal)
+#   canvas / on-dark:     #faf9f5  (warm cream white)
+#   surface-card:         #efe9de  (cream card tone)
+#   on-dark-soft:         #a09d96  (secondary muted text)
+#   muted:                #6c6a64  (dark muted / breadcrumbs)
+#   hairline / border:    #3d3d3a  (structural borders)
+#   success:              #5db872  (Claude success green)
+#   warning:              #d4a017  (warning amber)
+#   error:                #c64545  (error coral-red)
 
-ORANGE       = "\033[38;5;214m"    # ● Primary brand
-AMBER        = "\033[38;5;208m"    # ● Accent headings / active state
-BURNT        = "\033[38;5;172m"    # ● Deep accent (breadcrumbs, muted)
-DIM          = "\033[2m"           #   De-emphasized / secondary text
-DIM_ORANGE   = "\033[2;38;5;214m"  #   Structural lines
-BOLD         = "\033[1m"           #   Generic emphasis
-BOLD_ORANGE  = "\033[1;38;5;214m"  #   Strong brand emphasis
-BOLD_AMBER   = "\033[1;38;5;208m"  #   Active / highlighted option
-RED          = "\033[38;5;203m"    # ● Danger
-BOLD_RED     = "\033[1;38;5;203m"  #   Danger emphasis
-GREEN        = "\033[38;5;114m"    # ● Success
-BOLD_GREEN   = "\033[1;38;5;114m"  #   Success emphasis
-CYAN         = "\033[38;5;116m"    # ● Info / hints
-WHITE        = "\033[38;5;255m"    #   High-contrast text
-GRAY         = "\033[38;5;245m"    #   Muted labels
-DARK_GRAY    = "\033[38;5;240m"    #   Very muted (timestamps, etc.)
-RESET        = "\033[0m"
+RESET         = "\033[0m"
+BOLD          = "\033[1m"
+DIM           = "\033[2m"
+ITALIC        = "\033[3m"
+UNDERLINE     = "\033[4m"
 
-# Cursor & line control
-HIDE_CURSOR  = "\033[?25l"
-SHOW_CURSOR  = "\033[?25h"
-CLEAR_LINE   = "\033[2K\r"
+# Signature Anthropic Claude colors (TrueColor 24-bit)
+CORAL         = "\033[38;2;204;120;92m"    # #cc785c  Primary brand
+CORAL_ACTIVE  = "\033[38;2;169;88;62m"     # #a9583e  Active / hover
+CORAL_LIGHT   = "\033[38;2;225;145;98m"    # Highlight gradient step
+AMBER         = "\033[38;2;232;165;90m"    # #e8a55a  Accent amber
+TEAL          = "\033[38;2;93;184;166m"    # #5db8a6  Accent teal
+CREAM         = "\033[38;2;250;249;245m"   # #faf9f5  High-contrast text (on-dark)
+CREAM_CARD    = "\033[38;2;239;233;222m"   # #efe9de  Card cream
+MUTED         = "\033[38;2;160;157;150m"   # #a09d96  Secondary labels / captions
+MUTED_DARK    = "\033[38;2;108;106;100m"   # #6c6a64  Sub-headings / keys
+BORDER        = "\033[38;2;61;61;58m"      # #3d3d3a  Hairline separators
+BORDER_SUBTLE = "\033[38;2;46;44;41m"      # #2e2c29  Inner dividers
+
+SEMANTIC_SUCCESS = "\033[38;2;93;184;114m" # #5db872  Success green
+SEMANTIC_WARNING = "\033[38;2;212;160;23m" # #d4a017  Warning gold
+SEMANTIC_ERROR   = "\033[38;2;198;69;69m"  # #c64545  Error red
+
+# Background tones for cards/badges
+BG_CARD       = "\033[48;2;37;35;32m"      # #252320  Surface dark elevated
+BG_CORAL      = "\033[48;2;204;120;92m"    # #cc785c  Coral pill fill
+BG_DARK_SOFT  = "\033[48;2;31;30;27m"      # #1f1e1b  Soft dark panel
+
+# Backward-compatibility aliases for existing references
+ORANGE        = CORAL
+BURNT         = CORAL_ACTIVE
+DIM_ORANGE    = BORDER
+BOLD_ORANGE   = f"{BOLD}{CORAL}"
+BOLD_AMBER    = f"{BOLD}{AMBER}"
+GREEN         = SEMANTIC_SUCCESS
+BOLD_GREEN    = f"{BOLD}{SEMANTIC_SUCCESS}"
+RED           = SEMANTIC_ERROR
+BOLD_RED      = f"{BOLD}{SEMANTIC_ERROR}"
+CYAN          = TEAL
+WHITE         = CREAM
+GRAY          = MUTED
+DARK_GRAY     = MUTED_DARK
+
+# Cursor & terminal control
+HIDE_CURSOR   = "\033[?25l"
+SHOW_CURSOR   = "\033[?25h"
+CLEAR_LINE    = "\033[2K\r"
 
 
 # ══════════════════════════════════════════════════════════════
-#  KEY INPUT  (cross-platform raw keypress reader)
+#  CROSS-PLATFORM RAW KEY INPUT
 # ══════════════════════════════════════════════════════════════
 
 def _read_key():
     """
     Block until one keypress and return a semantic string:
       'up', 'down', 'enter', 'escape', or a character like '1'.
-    Windows uses msvcrt; Unix uses tty/termios.
+    Supports arrow keys and vim navigation ('k'/'j').
     """
     if os.name == "nt":
         import msvcrt
         raw = msvcrt.getwch()
-        # Arrow keys on Windows send a two-char sequence: '\xe0' or '\x00'
-        # followed by a scan-code character.
         if raw in ("\xe0", "\x00"):
             code = msvcrt.getwch()
             return {"H": "up", "P": "down", "K": "left", "M": "right"}.get(code)
@@ -64,7 +114,11 @@ def _read_key():
             return "enter"
         if raw == "\x1b":
             return "escape"
-        return raw  # regular character (digit, letter, etc.)
+        if raw in ("k", "K"):
+            return "up"
+        if raw in ("j", "J"):
+            return "down"
+        return raw
     else:
         import tty
         import termios
@@ -75,7 +129,6 @@ def _read_key():
             tty.setraw(fd)
             ch = sys.stdin.read(1)
             if ch == "\x1b":
-                # Could be a standalone Escape or the start of an arrow seq.
                 if _select.select([sys.stdin], [], [], 0.05)[0]:
                     ch2 = sys.stdin.read(1)
                     if ch2 == "[":
@@ -84,17 +137,21 @@ def _read_key():
                 return "escape"
             if ch in ("\r", "\n"):
                 return "enter"
+            if ch in ("k", "K"):
+                return "up"
+            if ch in ("j", "J"):
+                return "down"
             return ch
         finally:
             termios.tcsetattr(fd, termios.TCSADRAIN, old)
 
 
 # ══════════════════════════════════════════════════════════════
-#  ANIMATION ENGINE
+#  ANIMATION & SPINNER ENGINE
 # ══════════════════════════════════════════════════════════════
 
-def _type_text(text, delay=0.018, color="", end="\n"):
-    """Typewriter effect — prints each character with a small delay."""
+def _type_text(text, delay=0.015, color=MUTED, end="\n"):
+    """Smooth typewriter effect for taglines and system messages."""
     sys.stdout.write(color)
     for ch in text:
         sys.stdout.write(ch)
@@ -104,140 +161,154 @@ def _type_text(text, delay=0.018, color="", end="\n"):
     sys.stdout.flush()
 
 
-def _spinner(message, duration=1.2, color=ORANGE):
-    """Inline braille spinner that runs for a fixed duration, then clears."""
+def _spinner(message, duration=0.8, color=CORAL):
+    """
+    Claude Code-style smooth braille activity spinner.
+    Ensures cursor is safely restored upon completion.
+    """
     frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
     end_time = time.time() + duration
     i = 0
     sys.stdout.write(HIDE_CURSOR)
     try:
         while time.time() < end_time:
-            sys.stdout.write(f"{CLEAR_LINE}{color}{frames[i % len(frames)]}  {message}{RESET}")
+            sys.stdout.write(f"{CLEAR_LINE}  {color}{frames[i % len(frames)]}{RESET}  {MUTED}{message}{RESET}")
             sys.stdout.flush()
-            time.sleep(0.08)
+            time.sleep(0.07)
             i += 1
     finally:
         sys.stdout.write(f"{CLEAR_LINE}{SHOW_CURSOR}")
         sys.stdout.flush()
 
 
-def _progress_dots(message, count=3, delay=0.35, color=ORANGE):
+def _progress_dots(message, count=3, delay=0.25, color=CORAL):
     """Prints a message followed by animated dots."""
-    sys.stdout.write(f"{color}{message}{RESET}")
+    sys.stdout.write(f"  {color}{message}{RESET}")
     sys.stdout.flush()
     for _ in range(count):
         time.sleep(delay)
-        sys.stdout.write(f"{DIM}.{RESET}")
+        sys.stdout.write(f"{MUTED_DARK}.{RESET}")
         sys.stdout.flush()
     print()
 
 
 # ══════════════════════════════════════════════════════════════
-#  LAYOUT PRIMITIVES
+#  LAYOUT PRIMITIVES & CARDS (Claude Editorial Aesthetic)
 # ══════════════════════════════════════════════════════════════
 
-def _separator(width=50):
-    """Thin dim rule — the primary structural element."""
-    return f"{DIM_ORANGE}{'─' * width}{RESET}"
+def _separator(width=52):
+    """Sleek hairline rule matching Design.md dark theme."""
+    return f"  {BORDER}{'─' * width}{RESET}"
 
 
-def _heavy_separator(width=50):
-    """Double-stroke rule for major section boundaries."""
-    return f"{BURNT}{'━' * width}{RESET}"
+def _heavy_separator(width=52):
+    """Accent hairline rule."""
+    return f"  {CORAL_ACTIVE}{'─' * width}{RESET}"
 
 
-def _header(title, icon="", breadcrumb=""):
+def _header(title, breadcrumb=""):
     """
-    Section header with optional breadcrumb trail.
-    Style: dim breadcrumb above, icon + bold-amber title, separator.
+    Section header with breadcrumb trail and Anthropic radial spark.
+    Follows Claude Code visual hierarchy.
     """
-    parts = []
+    lines = []
     if breadcrumb:
-        parts.append(f"  {DARK_GRAY}{breadcrumb}{RESET}")
-    prefix = f"{icon}  " if icon else ""
-    parts.append(f"\n{BOLD_AMBER}{prefix}{title}{RESET}")
-    parts.append(_separator())
-    return "\n".join(parts)
+        lines.append(f"\n  {MUTED_DARK}{breadcrumb}{RESET}")
+    else:
+        lines.append("")
+    lines.append(f"  {CORAL}✻{RESET}  {BOLD}{CREAM}{title}{RESET}")
+    lines.append(_separator())
+    return "\n".join(lines)
+
+
+def _callout(title, lines, color=SEMANTIC_WARNING, width=52):
+    """
+    Anthropic-style rounded callout box for warnings, notices, and errors.
+    """
+    title_bar = f"╭─ {title} "
+    fill_len = max(width - len(title) - 5, 2)
+    print(f"  {color}{title_bar}{'─' * fill_len}╮{RESET}")
+    for line in lines:
+        pad_len = max(width - len(line) - 4, 0)
+        print(f"  {color}│{RESET}  {CREAM}{line}{' ' * pad_len}  {color}│{RESET}")
+    print(f"  {color}╰{'─' * width}╯{RESET}")
 
 
 def _option(key, label, indent=2, active=False):
     """
-    Menu option row.
-    Active  → amber-filled circle ● + bold amber text
-    Default → dim circle ○ + gray key + orange label
+    Menu option row styled after Claude Code interactive selectors.
+    Active   → Bold Coral pointer '❯' + Coral key + Bold Cream label
+    Inactive → Muted key + Soft Cream label
     """
     pad = " " * indent
     if active:
-        return f"{pad}{AMBER}●{RESET}  {BOLD_AMBER}{key}{RESET}  {BOLD_AMBER}{label}{RESET}"
-    return f"{pad}{DARK_GRAY}○{RESET}  {GRAY}{key}{RESET}  {ORANGE}{label}{RESET}"
+        return f"{pad}{BOLD}{CORAL}❯{RESET} {BOLD}{CORAL}{key}.{RESET}  {BOLD}{CREAM}{label}{RESET}"
+    return f"{pad}  {MUTED_DARK}{key}.{RESET}  {MUTED}{label}{RESET}"
 
 
 def _prompt(text="❯"):
-    """Minimal branded input prompt (for non-menu text inputs)."""
-    return f"\n{BOLD_ORANGE}{text}{RESET} "
+    """Signature Claude Code Coral prompt indicator."""
+    return f"\n  {BOLD}{CORAL}{text}{RESET} "
 
 
 def _clear_screen():
-    """Clear the viewport and park the cursor at 1,1."""
+    """Clear the terminal viewport."""
     sys.stdout.write("\033[2J\033[H")
     sys.stdout.flush()
 
 
 # ══════════════════════════════════════════════════════════════
-#  INTERACTIVE SELECTOR
+#  INTERACTIVE KEYBOARD SELECTOR
 # ══════════════════════════════════════════════════════════════
-#
-#  Arrow-key menu inspired by Claude Code / Inquirer prompts.
-#    ↑/↓  navigate
-#    Enter confirm
-#    1-9   instant jump (press number key to select directly)
-#    Esc   select last option (usually "Back" / "Exit")
-#
-#  Falls back to classic number input when stdin is not a tty.
 
 def _select_menu(options, indent=2):
     """
-    Interactive keyboard-driven menu.
+    Keyboard-driven interactive menu styled after Claude Code.
+
+    Features:
+      ↑/↓ or j/k : Navigate options
+      Enter      : Confirm selection
+      1-9        : Quick-pick direct option
+      Esc        : Select last option (Back/Exit)
 
     Parameters
     ----------
     options : list[tuple[str, str]]
-        Each entry is (key, label), e.g. ("1", "Encryption Settings").
+        List of (key, label) tuples.
 
     Returns
     -------
     str
-        The *key* string of the selected option ("1", "2", …).
+        The selected key string.
     """
-    # ── Fallback for non-interactive / piped stdin ────────────
+    # Fallback for non-interactive / piped environments
     if not sys.stdin.isatty():
         for key, label in options:
             print(_option(key, label, indent=indent))
-        print()
         print(_separator())
-        return input(_prompt()).strip()
+        try:
+            return input(_prompt()).strip()
+        except EOFError:
+            return options[-1][0]
 
     selected = 0
     count = len(options)
-    hint = f"  {DARK_GRAY}↑↓ navigate  ↵ select  {DIM}[1-{count}] quick-pick{RESET}"
+    hint = f"  {MUTED_DARK}↑/↓ navigate  •  ↵ select  •  [1-{count}] quick pick  •  esc back{RESET}"
     extra_lines = 2  # blank line + hint line
     total_lines = count + extra_lines
 
     sys.stdout.write(HIDE_CURSOR)
     sys.stdout.flush()
 
-    # ── Initial staggered reveal ──────────────────────────────
+    # Initial reveal
     for i, (key, label) in enumerate(options):
-        sys.stdout.write(
-            _option(key, label, indent=indent, active=(i == selected)) + "\n"
-        )
+        sys.stdout.write(_option(key, label, indent=indent, active=(i == selected)) + "\n")
         sys.stdout.flush()
-        time.sleep(0.04)
+        time.sleep(0.02)
 
     sys.stdout.write("\n" + hint + "\n")
     sys.stdout.flush()
 
-    # ── Navigation loop ───────────────────────────────────────
     try:
         while True:
             k = _read_key()
@@ -249,19 +320,22 @@ def _select_menu(options, indent=2):
             elif k == "enter":
                 break
             elif k == "escape":
-                selected = count - 1   # jump to last ("Back" / "Exit")
+                selected = count - 1
                 break
             elif k is not None and k.isdigit():
-                # Quick-pick: press a number key to jump + confirm
+                # Quick-pick direct jump
+                matched = False
                 for idx, (okey, _label) in enumerate(options):
                     if okey == k:
                         selected = idx
+                        matched = True
                         break
-                break  # confirm immediately on number press
+                if matched:
+                    break
             else:
                 continue
 
-            # ── Re-render options in place ────────────────────
+            # In-place re-render of option lines
             sys.stdout.write(f"\033[{total_lines}A")
             for i, (key, label) in enumerate(options):
                 sys.stdout.write(
@@ -273,22 +347,22 @@ def _select_menu(options, indent=2):
             sys.stdout.write(CLEAR_LINE + hint + "\n")
             sys.stdout.flush()
 
+    except KeyboardInterrupt:
+        sys.stdout.write(SHOW_CURSOR)
+        sys.stdout.flush()
+        raise
     finally:
         sys.stdout.write(SHOW_CURSOR)
         sys.stdout.flush()
 
-    # ── Collapse to selection confirmation ────────────────────
-    # Replace the entire options block with a single answer line.
+    # In-place collapse to a single clean confirmation line
     sys.stdout.write(f"\033[{total_lines}A")
-    # First line: the confirmed choice
     sys.stdout.write(
         CLEAR_LINE
-        + f"  {BOLD_GREEN}✔{RESET}  {ORANGE}{options[selected][1]}{RESET}\n"
+        + f"  {SEMANTIC_SUCCESS}✔{RESET}  {BOLD}{CREAM}{options[selected][1]}{RESET}\n"
     )
-    # Clear remaining lines
     for _ in range(total_lines - 1):
         sys.stdout.write(CLEAR_LINE + "\n")
-    # Move cursor back up to right after the answer line
     sys.stdout.write(f"\033[{total_lines - 1}A")
     sys.stdout.flush()
 
@@ -296,54 +370,82 @@ def _select_menu(options, indent=2):
 
 
 # ══════════════════════════════════════════════════════════════
-#  STATUS MESSAGES  (for use in Encrypter.py or anywhere)
+#  STATUS MESSAGES (Claude Editorial Indicators)
 # ══════════════════════════════════════════════════════════════
 
 def success(msg):
-    """Green checkmark + message."""
-    print(f"  {BOLD_GREEN}✔{RESET}  {GREEN}{msg}{RESET}")
+    """Claude green checkmark + message."""
+    print(f"  {SEMANTIC_SUCCESS}✔{RESET}  {CREAM}{msg}{RESET}")
+
 
 def error(msg):
-    """Red cross + message."""
-    print(f"  {BOLD_RED}✖{RESET}  {RED}{msg}{RESET}")
+    """Claude red cross + message."""
+    print(f"  {SEMANTIC_ERROR}✖{RESET}  {SEMANTIC_ERROR}{msg}{RESET}")
+
 
 def warn(msg):
-    """Amber warning triangle + message."""
-    print(f"  {BOLD_AMBER}▲{RESET}  {AMBER}{msg}{RESET}")
+    """Claude amber warning indicator + message."""
+    print(f"  {SEMANTIC_WARNING}▲{RESET}  {AMBER}{msg}{RESET}")
+
 
 def info(msg):
-    """Cyan info dot + message."""
-    print(f"  {CYAN}●{RESET}  {CYAN}{msg}{RESET}")
+    """Claude teal Anthropic radial spark + message."""
+    print(f"  {TEAL}✻{RESET}  {MUTED}{msg}{RESET}")
 
 
 # ══════════════════════════════════════════════════════════════
-#  LOGO / BANNER
+#  CLAUDE CODE LOGO / STARTUP BANNER
 # ══════════════════════════════════════════════════════════════
+# Features:
+#   1. Clawd mascot block with version pills
+#   2. Filled block wordmark 'ENDEK' with 6-step vertical coral gradient
+#   3. Typewriter tagline with Anthropic radial spark
 
-_LOGO_LINES = [
-    "  ███████╗",
-    "  ██╔════╝      ██████╗       ██╗  ██╗",
-    "  ██║    _ __   ██╔══██╗      ██║ ██╔╝",
-    "  █████╗| '_ \\  ██║  ██║/ _ \\ ██╠═██╔╝",
-    "  ██╔══╝| | | | ██║  ██║  __/ ██║╚██╗",
-    "  ██║   |_| |_| ██████╔╝\\___| ██║ ╚██╗",
-    "  ███████╗      ╚═════╝       ╚═╝  ╚═╝",
+_ENDEK_BLOCK_LOGO = [
+    "  ███████╗███╗   ██╗██████╗ ███████╗██╗  ██╗",
+    "  ██╔════╝████╗  ██║██╔══██╗██╔════╝██║ ██╔╝",
+    "  █████╗  ██╔██╗ ██║██║  ██║█████╗  █████╔╝ ",
+    "  ██╔══╝  ██║╚██╗██║██║  ██║██╔══╝  ██╔═██╗ ",
+    "  ███████╗██║ ╚████║██████╔╝███████╗██║  ██╗",
+    "  ╚══════╝╚═╝  ╚═══╝╚═════╝ ╚══════╝╚═╝  ╚═╝",
+]
+
+_GRADIENT_STEPS = [
+    "\033[38;2;238;175;110m",  # Soft amber highlight
+    "\033[38;2;225;145;98m",   # Amber-coral
+    "\033[38;2;215;130;94m",   # Vibrant coral
+    "\033[38;2;204;120;92m",   # Signature Claude Coral (#cc785c)
+    "\033[38;2;185;102;76m",   # Deep coral
+    "\033[38;2;169;88;62m",    # Primary active coral (#a9583e)
 ]
 
 
 def logos():
-    """Animated banner with staggered line reveal + typewriter tagline."""
+    """
+    Claude Code-inspired startup banner with animated Clawd mascot,
+    vertical coral gradient wordmark, and tagline.
+    """
     _clear_screen()
     print()
 
-    for line in _LOGO_LINES:
-        print(f"{ORANGE}{line}{RESET}")
+    # 1. Claude Code Mascot Header
+    print(f"  {CORAL}▐▛▀▀▀▀▜▌{RESET}  {BOLD}{CREAM}EnDek{RESET} {MUTED}v2.7.0{RESET} {BORDER}·{RESET} {TEAL}Experimental CLI v1.5.0{RESET}")
+    print(f"  {CORAL}▐▌ · ·▐▌{RESET}  {MUTED}Lightweight interactive encryption toolkit{RESET}")
+    print(f"  {CORAL}▐▙▄▄▄▄▟▌{RESET}  {MUTED_DARK}https://github.com/jovancherian-source/EnDek{RESET}")
+    print()
+    sys.stdout.flush()
+    time.sleep(0.04)
+
+    # 2. Gradient Block Logo Reveal
+    for color, line in zip(_GRADIENT_STEPS, _ENDEK_BLOCK_LOGO):
+        print(f"{color}{line}{RESET}")
         sys.stdout.flush()
-        time.sleep(0.045)
+        time.sleep(0.025)
 
     print()
-    _type_text("  terminal encryption toolkit", delay=0.025, color=DIM)
-    print(f"  {DARK_GRAY}{'─' * 38}{RESET}")
+    # 3. Subtitle Tagline
+    _type_text(f"  {CORAL}✻{RESET}  {MUTED}terminal encryption toolkit{RESET}  {BORDER}·{RESET}  {MUTED_DARK}interactive session{RESET}", delay=0.012)
+    print(_separator())
     print()
 
 
@@ -354,11 +456,10 @@ def logos():
 def EnDek_config_logo():
     """
     Main configuration hub.
-    Returns the key string of the selected option ("1"–"5").
+    Returns selected option key ("1"–"5").
     """
-    print(_header("EnDek Config", "⚙", breadcrumb="home"))
+    print(_header("EnDek Configuration", breadcrumb="home › config"))
     print()
-
     return _select_menu([
         ("1", "Encryption Settings"),
         ("2", "Account Settings"),
@@ -368,12 +469,10 @@ def EnDek_config_logo():
     ])
 
 
-# ── EnDek Settings ───────────────────────────────────────────
-
 def endek_dual_settings():
-    print(_header("EnDek Settings", "⚙", breadcrumb="home / config"))
+    """EnDek system and version settings."""
+    print(_header("EnDek Settings", breadcrumb="home › config › system"))
     print()
-
     return _select_menu([
         ("1", "About EnDek"),
         ("2", "Check for Updates"),
@@ -381,49 +480,39 @@ def endek_dual_settings():
     ])
 
 
-# ── Encryption Settings ──────────────────────────────────────
-
 def EnDek_encyption_settings_menu():
-    print(_header("Encryption Settings", "🔐", breadcrumb="home / config"))
+    """Encryption key and algorithm settings."""
+    print(_header("Encryption Settings", breadcrumb="home › config › encryption"))
     print()
-
     return _select_menu([
-        ("1", "Enter custom key"),
-        ("2", "Generate secure random key"),
-        ("3", "Scramble settings"),
-        ("4", "Export key"),
-        ("5", "Back"),
+        ("1", "Enter Custom Key"),
+        ("2", "Generate Secure Random Key"),
+        ("3", "Scramble Settings"),
+        ("4", "Export Key"),
+        ("5", "← Back"),
     ])
 
 
-# ── Database Settings ─────────────────────────────────────────
-
 def Database_settings_menu():
-    print(_header("Database Settings", "🗄", breadcrumb="home / config"))
+    """Database management settings with callout warning."""
+    print(_header("Database Settings", breadcrumb="home › config › database"))
     print()
-    print(f"  {BOLD_RED}▲  Warning{RESET}")
-    print(f"  {GRAY}Clearing the database permanently removes{RESET}")
-    print(f"  {GRAY}all stored data. This cannot be undone.{RESET}")
+    _callout("▲ Warning", [
+        "Clearing the database permanently removes all stored data.",
+        "Your encryption keys and accounts will be deleted.",
+        "This action cannot be undone."
+    ], color=SEMANTIC_WARNING)
     print()
-    print(_separator())
-    print()
-
     return _select_menu([
         ("1", "Clear Database"),
         ("2", "← Back"),
     ])
 
 
-# ── Account Settings ──────────────────────────────────────────
-
 def Account_settings_menu():
-    print(_header("Account Settings", "👤", breadcrumb="home / config"))
+    """Account profile settings."""
+    print(_header("Account Settings", breadcrumb="home › config › account"))
     print()
-    print(f"  {GRAY}General{RESET}")
-
-    # Print the "General" option manually, then danger section,
-    # but use a single _select_menu over all options for unified navigation.
-
     return _select_menu([
         ("1", "Log Out"),
         ("2", "Delete Account"),
@@ -431,59 +520,47 @@ def Account_settings_menu():
     ])
 
 
-# ── Delete Account Confirmation ───────────────────────────────
-
 def Account_confirmation_menu():
-    print(_header("Delete Account", "▲", breadcrumb="home / config / account"))
+    """Account deletion confirmation dialog."""
+    print(_header("Delete Account", breadcrumb="home › config › account › delete"))
     print()
-    print(f"  {BOLD_RED}This action cannot be undone.{RESET}")
-    print(f"  {GRAY}Your account and all associated data{RESET}")
-    print(f"  {GRAY}will be permanently deleted.{RESET}")
+    _callout("▲ Permanent Deletion", [
+        "Your local account and all associated keys will be wiped.",
+        "Data encrypted with your current keys will be lost",
+        "unless you have exported them."
+    ], color=SEMANTIC_ERROR)
     print()
-    print(_separator())
-    print()
-
     return _select_menu([
-        ("1", "Yes, Delete My Account"),
+        ("1", "Yes, Permanently Delete My Account"),
         ("2", "Cancel"),
     ])
 
 
-# ── Scramble Settings (first time) ────────────────────────────
-
 def first_Scramble_settings_menu():
-    print(_header("Scramble Settings", "🔀", breadcrumb="home / config / encryption"))
+    """First-time text scrambling toggle."""
+    print(_header("Scramble Settings", breadcrumb="home › config › encryption › scrambler"))
     print()
-
     return _select_menu([
         ("1", "Enable Text Scrambling"),
         ("2", "← Back"),
     ])
 
 
-# ── Scramble Settings (already enabled) ───────────────────────
-
 def Scramble_settings_menu():
-    print(_header("Scrambler Settings", "🔀", breadcrumb="home / config / encryption"))
+    """Scrambler management menu."""
+    print(_header("Scrambler Settings", breadcrumb="home › config › encryption › scrambler"))
     print()
-
     return _select_menu([
-        ("1", "Change Scrambler"),
+        ("1", "Change Scrambler Key"),
         ("2", "Disable Scrambler"),
         ("3", "← Back"),
     ])
 
 
-# ── Change Scrambler — method picker ─────────────────────────
-
 def new_Scramble_settings_menu():
-    """
-    Shown when the user picks 'Change Scrambler'.
-    Returns "1" (custom key), "2" (random key), or "3" (cancel).
-    """
-    print(_header("Scrambler Key", "🔑", breadcrumb="home / config / encryption / scrambler"))
+    """Scrambler key generation mode."""
+    print(_header("Scrambler Key Setup", breadcrumb="home › config › encryption › scrambler › key"))
     print()
-
     return _select_menu([
         ("1", "Enter Custom Scrambler Key"),
         ("2", "Generate Random Scrambler Key"),
@@ -491,54 +568,41 @@ def new_Scramble_settings_menu():
     ])
 
 
-# ── Enter Custom Scrambler Key ────────────────────────────────
-
 def new_Scramble_key_for_pre_user():
-    """
-    Prompts the user to type a custom scrambler key string.
-    Returns the raw key string.
-    """
-    print(_header("Custom Scrambler Key", "🔑", breadcrumb="home / config / encryption / scrambler"))
+    """Prompt for a custom scrambler key string."""
+    print(_header("Custom Scrambler Key", breadcrumb="home › config › encryption › scrambler › key"))
     print()
     return prompt_text("Scrambler Key")
 
 
 # ══════════════════════════════════════════════════════════════
-#  INTERACTIVE INPUT PROMPTS
+#  INTERACTIVE INPUT PROMPTS & REPL
 # ══════════════════════════════════════════════════════════════
-#
-#  Styled input helpers for login, passwords, confirmations,
-#  and the main REPL. These replace raw input()/getpass calls
-#  in Encrypter.py for a cohesive Claude Code-like experience.
-
-import getpass as _getpass
-
 
 def prompt_username():
     """
-    Styled username input with label and branded prompt.
-    Returns the entered username string.
+    Styled username input in Claude Code editorial style.
     """
-    print(f"\n  {GRAY}Sign in to EnDek{RESET}")
+    print()
+    print(f"  {CORAL}✻{RESET}  {BOLD}{CREAM}Sign in to EnDek{RESET}")
     print(_separator())
-    return input(f"  {ORANGE}username{RESET} {BOLD_ORANGE}❯{RESET} ")
+    return input(f"  {MUTED}username{RESET} {BOLD}{CORAL}❯{RESET} ").strip()
 
 
 def prompt_password(label="password"):
     """
-    Styled password input — characters are masked.
-    Uses getpass for secure entry with a branded label.
+    Secure password prompt with Claude Code styling.
     """
-    return _getpass.getpass(f"  {ORANGE}{label}{RESET} {BOLD_ORANGE}❯{RESET} ")
+    return _getpass.getpass(f"  {MUTED}{label}{RESET} {BOLD}{CORAL}❯{RESET} ").strip()
 
 
 def prompt_confirm(question, default_yes=False):
     """
-    Interactive yes/no selector using the keyboard menu.
-    Returns True for yes, False for no.
+    Interactive keyboard yes/no selector.
+    Returns True for Yes, False for No.
     """
-    print(f"\n  {AMBER}{question}{RESET}")
     print()
+    print(f"  {CORAL}✻{RESET}  {CREAM}{question}{RESET}")
     if default_yes:
         opts = [("y", "Yes"), ("n", "No")]
     else:
@@ -549,56 +613,83 @@ def prompt_confirm(question, default_yes=False):
 
 def prompt_text(label):
     """
-    Styled single-line text input with a visible label.
+    Styled single-line text input with clean prompt.
     """
-    return input(f"  {ORANGE}{label}{RESET} {BOLD_ORANGE}❯{RESET} ")
+    return input(f"  {MUTED}{label}{RESET} {BOLD}{CORAL}❯{RESET} ").strip()
 
 
 def prompt_repl(username=None):
     """
-    Main REPL prompt for encrypt/decrypt input.
-    Hint: type /config for settings, exit to quit.
+    Main interactive REPL prompt styled after Claude Code.
     """
-    return input(f"\n  {BOLD_ORANGE}❯{RESET} ")
+    return input(f"\n  {BOLD}{CORAL}❯{RESET} ").strip()
 
 
 def prompt_guest_repl():
     """
-    REPL prompt for non-authenticated guest sessions.
+    Guest REPL prompt for non-authenticated sessions.
     """
-    return input(f"\n  {BOLD_ORANGE}❯{RESET} ")
+    return input(f"\n  {MUTED_DARK}[guest]{RESET} {BOLD}{CORAL}❯{RESET} ").strip()
 
 
 def welcome(username):
     """
-    Welcome banner shown after successful login.
+    Welcome banner displayed after successful user authentication.
     """
-    _spinner(f"Authenticating {username}", duration=0.8)
+    _spinner(f"Authenticating {username}", duration=0.6)
     print()
-    print(f"  {BOLD_GREEN}✔{RESET}  {GREEN}Welcome back, {BOLD}{username}{RESET}")
-    print(f"  {DARK_GRAY}Type text to encrypt · /config for settings · exit to quit{RESET}")
+    print(f"  {SEMANTIC_SUCCESS}✔{RESET}  {BOLD}{CREAM}Welcome back, {username}{RESET}")
+    print(f"  {MUTED}Enter plain text to encrypt, or ciphertext to decrypt.{RESET}")
+    print(f"  {MUTED_DARK}Commands: {CORAL}/config{MUTED_DARK} settings  •  {CORAL}/logout{MUTED_DARK} sign out  •  {CORAL}/exit{MUTED_DARK} quit{RESET}")
     print(_separator())
 
 
 def welcome_new_user(username):
     """
-    Welcome banner shown after account creation.
+    Welcome banner displayed after account registration.
     """
-    _spinner("Creating account", duration=0.8)
+    _spinner("Initializing new user profile", duration=0.7)
     print()
-    print(f"  {BOLD_GREEN}✔{RESET}  {GREEN}Account created for {BOLD}{username}{RESET}")
+    print(f"  {SEMANTIC_SUCCESS}✔{RESET}  {BOLD}{CREAM}Account created for {username}{RESET}")
+    print(f"  {MUTED}Your encryption keys will be stored locally for future sessions.{RESET}")
     print(_separator())
 
 
-def show_result(text):
+def show_result(text, label="Result"):
     """
-    Display an encryption/decryption result with visual emphasis.
+    Display cryptographic output in a Claude Code terminal code card.
+    Handles long text wrapping gracefully.
     """
-    print(f"\n  {BOLD_ORANGE}→{RESET}  {WHITE}{text}{RESET}")
+    max_w = 66
+    lines = textwrap.wrap(text, width=max_w) if len(text) > max_w else [text]
+    box_w = max(max(len(l) for l in lines) + 4, len(label) + 8, 46)
+
+    print(f"\n  {BORDER}╭─ {CORAL}{label}{BORDER} {'─' * (box_w - len(label) - 5)}╮{RESET}")
+    for l in lines:
+        pad = box_w - len(l) - 4
+        print(f"  {BORDER}│{RESET}  {BOLD}{CREAM}{l}{RESET}{' ' * pad}  {BORDER}│{RESET}")
+    print(f"  {BORDER}╰{'─' * box_w}╯{RESET}")
 
 
 def show_key(label, value):
     """
-    Display a key-value pair (e.g. encryption key export).
+    Display an exported key-value pair with Claude Code alignment.
     """
-    print(f"  {GRAY}{label}:{RESET} {WHITE}{value}{RESET}")
+    print(f"  {MUTED}{label:<18}{RESET} {BORDER}│{RESET}  {BOLD}{CREAM}{value}{RESET}")
+
+
+def show_about(version, cli_version, key_status="Active", users_count=1, scrambler_enabled=False):
+    """
+    Display formatted system information in an Anthropic Claude Code card.
+    """
+    w = 54
+    scramble_str = f"{SEMANTIC_SUCCESS}Enabled{RESET}" if scrambler_enabled else f"{MUTED}Disabled{RESET}"
+    user_str = f"{users_count} local user" if users_count == 1 else f"{users_count} local users"
+
+    print(f"\n  {BORDER}╭─ {CORAL}EnDek System Information{BORDER} {'─' * (w - 29)}╮{RESET}")
+    print(f"  {BORDER}│{RESET}  {MUTED}{'EnDek Core':<20}{RESET} {BORDER}│{RESET}  {CREAM}{version:<25}{RESET}  {BORDER}│{RESET}")
+    print(f"  {BORDER}│{RESET}  {MUTED}{'CLI Interface':<20}{RESET} {BORDER}│{RESET}  {CREAM}{cli_version + ' (Claude Code Style)':<25}{RESET}  {BORDER}│{RESET}")
+    print(f"  {BORDER}│{RESET}  {MUTED}{'Key Status':<20}{RESET} {BORDER}│{RESET}  {SEMANTIC_SUCCESS}{key_status:<25}{RESET}  {BORDER}│{RESET}")
+    print(f"  {BORDER}│{RESET}  {MUTED}{'Registered Users':<20}{RESET} {BORDER}│{RESET}  {CREAM}{user_str:<25}{RESET}  {BORDER}│{RESET}")
+    print(f"  {BORDER}│{RESET}  {MUTED}{'Scrambler Engine':<20}{RESET} {BORDER}│{RESET}  {scramble_str:<34}{RESET} {BORDER}│{RESET}")
+    print(f"  {BORDER}╰{'─' * w}╯{RESET}\n")

@@ -23,7 +23,7 @@ Experimental_CLI_Version = "1.5.0"
 EnDek_name = "Ludicrous"
 latest_version = updater.intial_update_checker(EnDek_verison)
 if latest_version is not None:
-    print(latest_version)
+    CLI.info(latest_version)
 
 class AccoutDeletion(Exception):
     pass
@@ -333,22 +333,20 @@ def main():
                                     user_request_dual_endek = CLI.endek_dual_settings()
                                     if user_request_dual_endek == "1":
                                         CLI.logos()
-                                        print("Version " + EnDek_verison)
-                                        print("CLI Version " + Experimental_CLI_Version)
-                                        print("Encryption key status: currently running")
                                         cursor1.execute("SELECT * FROM users ")
                                         users_number = len(cursor1.fetchall())
-                                        if users_number != 1:
-                                            print(f"There are {users_number} local users.")
-                                        else:
-                                            print("There is 1 local user.")
-                                        is_using_srambler  = cursor1.execute(f'SELECT scrambler FROM users WHERE username = ?' , (input_username,)).fetchone()[0]
-                                        if is_using_srambler == 1:
-                                            print("Scrambler status: Enabled")
-                                        elif is_using_srambler == 0:
-                                            print("Scrambler status: Disabled")
+                                        is_using_srambler = cursor1.execute(f'SELECT scrambler FROM users WHERE username = ?', (input_username,)).fetchone()[0]
+                                        CLI.show_about(
+                                            version=EnDek_verison,
+                                            cli_version=Experimental_CLI_Version,
+                                            key_status="Active",
+                                            users_count=users_number,
+                                            scrambler_enabled=(is_using_srambler == 1)
+                                        )
                                     elif user_request_dual_endek == "2":
-                                        print(updater.update_checker(EnDek_verison))
+                                        update_info = updater.update_checker(EnDek_verison)
+                                        if update_info:
+                                            CLI.info(update_info)
                             if len(user_covert_input) !=0 :
                                 if user_covert_input[-1] == "E" and user_input !="/config":
                                     cursor.execute(f'SELECT * FROM "{input_username}"')
