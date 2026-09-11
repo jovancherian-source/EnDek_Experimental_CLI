@@ -13,12 +13,13 @@ from Scrambler import pre_scrambler
 from Scrambler import scrambeler_updater
 from argon2 import PasswordHasher
 import string
-from Functionalities import updater
+import sys
+from Functionalities import updater, cache_clearer
 
 
 CLI.logos()
 
-EnDek_verison = "2.7.0"
+EnDek_verison = "2.7.1"
 Experimental_CLI_Version = "1.5.0"
 EnDek_name = "Ludicrous"
 latest_version = updater.intial_update_checker(EnDek_verison)
@@ -184,22 +185,26 @@ def main():
                                             if user_encryption_key[-1] == "S":
                                                 cursor1.execute("UPDATE users SET scrambler = ? WHERE username = ? " , (True, input_username))
                                                 unscrambler_key = CLI.prompt_text("Scrambler Key")
-                                                user_encryption_key_unscrambled = new_encryption_key_unscrambler(scrambeled_encryption_key = pre_user_encryption_key, unscrambler = unscrambler_key , username = input_username)
-                                                user_encryption_key_unscrambled = letter_remover.LetterFunctions.letter_adder(user_encryption_key_unscrambled)
-                                                cursor.execute(f'DELETE FROM "{input_username}"')
-                                                updated_encryption_key = twod_list_maker.list_maker(user_encryption_key_unscrambled)
-                                                for key in updated_encryption_key:
-                                                    cursor.execute(f'INSERT INTO "{input_username}"( encryption_key , encryption_value) VALUES(?,?)', (key[0] , key[1]))
-                                                CLI.success("Encryption key updated successfully...")
-                                                cursor.execute(f'SELECT * FROM "{input_username}"')
-                                                encrypt_demo = cursor.fetchall()
-                                                encrypt1 = database_to_dict.database_to_dict(encrypt_demo)
-                                                Decrypter  = {value: key for key, value in encrypt1.items()}
-                                                connection.commit()
-                                                connection1.commit()
+                                                if len(unscrambler_key) != 0:
+                                                    user_encryption_key_unscrambled = new_encryption_key_unscrambler(scrambeled_encryption_key = pre_user_encryption_key, unscrambler = unscrambler_key , username = input_username)
+                                                    user_encryption_key_unscrambled = letter_remover.LetterFunctions.letter_adder(user_encryption_key_unscrambled)
+                                                    cursor.execute(f'DELETE FROM "{input_username}"')
+                                                    updated_encryption_key = twod_list_maker.list_maker(user_encryption_key_unscrambled)
+                                                    for key in updated_encryption_key:
+                                                        cursor.execute(f'INSERT INTO "{input_username}"( encryption_key , encryption_value) VALUES(?,?)', (key[0] , key[1]))
+                                                    CLI.success("Encryption key updated successfully...")
+                                                    cursor.execute(f'SELECT * FROM "{input_username}"')
+                                                    encrypt_demo = cursor.fetchall()
+                                                    encrypt1 = database_to_dict.database_to_dict(encrypt_demo)
+                                                    Decrypter  = {value: key for key, value in encrypt1.items()}
+                                                    connection.commit()
+                                                    connection1.commit()
+                                                else:
+                                                    CLI.error("scrambler key cannot be empty.")
                                             elif user_encryption_key[-1] != "S":
                                                 cursor.execute(f'DELETE FROM "{input_username}"')
-                                                updated_encryption_key = twod_list_maker.list_maker(user_encryption_key)
+                                                user_encryption_key_added = letter_remover.LetterFunctions.letter_adder(user_encryption_key)
+                                                updated_encryption_key = twod_list_maker.list_maker(user_encryption_key_added)
                                                 for key in updated_encryption_key:
                                                     cursor.execute(f'INSERT INTO "{input_username}"( encryption_key , encryption_value) VALUES(?,?)', (key[0] , key[1]))
                                                 CLI.success("Encryption key updated successfully...")
@@ -337,27 +342,35 @@ def main():
                                         update_info = updater.update_checker(EnDek_verison)
                                         if update_info:
                                             CLI.info(update_info)
-                            if len(user_covert_input) !=0 :
-                                if user_covert_input[-1] == "E" and user_input !="/config":
+                                    elif user_request_dual_endek == "3":
+                                        if CLI.prompt_confirm("Are you sure you want to clear the cache? This can result in slower speed for sometime, but can increase speed over time. Don't use this feature frequently."):
+                                            trail = cache_clearer.cache_clearer()
+                                            if trail == True:
+                                                CLI.success("Cache cleared successfully...")
+                                            elif trail == False:
+                                                CLI.error("Cache clearing failed...")
+                            if len(user_covert_input) != 0:
+                                if user_covert_input[-1] == "E" and user_input != "/config":
                                     cursor.execute(f'SELECT * FROM "{input_username}"')
                                     encrypt_demo = cursor.fetchall()
                                     encrypt = database_to_dict.database_to_dict(encrypt_demo)
-                                    Decrypter  = {value: key for key, value in encrypt1.items()}
+                                    Decrypter = {value: key for key, value in encrypt1.items()}
                                     for i in user_covert_input:
                                         if i in Decrypter:
-                                            return_list.append(Decrypter.get(i , "letter not found :("))
-                                    return_word = "". join(return_list)
+                                            return_list.append(Decrypter.get(i, "letter not found :("))
+                                    return_word = "".join(return_list)
                                     CLI.show_result(return_word)
-                                if user_covert_input[-1] != "E" and user_input !="/config":
-                                    for i in user_covert_input :
+                                if user_covert_input[-1] != "E" and user_input != "/config":
+                                    invalid_character_list = []
+                                    for i in user_covert_input:
                                         try:
                                             return_list.append(encrypt1[i.lower()])               
-                                            if len(user_covert_input) == len(return_list):
-                                                return_list.append("E")
-                                                return_sentence = "". join(return_list)
-                                                CLI.show_result(return_sentence)
                                         except KeyError:
-                                            CLI.error("invalid character: " + i)
+                                            invalid_character_list.append(i)
+                                    return_list.append("E")
+                                    CLI.show_result("".join(return_list))
+                                    if len(invalid_character_list) != 0:
+                                        CLI.warn("skipped invalid characters: " + " ".join(invalid_character_list))
                     except AccoutDeletion:
                         CLI.success("account deleted sucessfully...")
                     except KeyboardInterrupt:

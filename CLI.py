@@ -429,7 +429,7 @@ def logos():
     print()
 
     # 1. Claude Code Mascot Header
-    print(f"  {CORAL}▐▛▀▀▀▀▜▌{RESET}  {BOLD}{CREAM}EnDek{RESET} {MUTED}v2.7.0{RESET} {BORDER}·{RESET} {TEAL}Experimental CLI v1.5.0{RESET}")
+    print(f"  {CORAL}▐▛▀▀▀▀▜▌{RESET}  {BOLD}{CREAM}EnDek{RESET} {MUTED}v2.7.1{RESET} {BORDER}·{RESET} {TEAL}Experimental CLI v1.5.0{RESET}")
     print(f"  {CORAL}▐▌ · ·▐▌{RESET}  {MUTED}Lightweight interactive encryption toolkit{RESET}")
     print(f"  {CORAL}▐▙▄▄▄▄▟▌{RESET}  {MUTED_DARK}https://github.com/jovancherian-source/EnDek{RESET}")
     print()
@@ -476,7 +476,8 @@ def endek_dual_settings():
     return _select_menu([
         ("1", "About EnDek"),
         ("2", "Check for Updates"),
-        ("3", "← Back"),
+        ("3", "Clear Cache"),
+        ("4", "← Back"),
     ])
 
 
