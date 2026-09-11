@@ -73,7 +73,7 @@ def new_encryption_key_unscrambler(scrambeled_encryption_key, unscrambler , user
 def user_panic(username):
     connection = sqlite3.connect("scrambler.db")
     cursor = connection.cursor()
-    cursor.execute(f"DELETE FROM '{username}'")
+    cursor.execute(f"DROP TABLE IF EXISTS '{username}'")
     connection.commit()
     connection.close()
 def unscrambler(scrambled_encryption_key, username):
